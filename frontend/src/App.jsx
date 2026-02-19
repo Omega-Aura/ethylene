@@ -5,7 +5,7 @@ import KPICards from './components/KPICards';
 import Charts from './components/Charts';
 import DataTable from './components/DataTable';
 
-const API = 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 function PathwayDiagram() {
   return (
