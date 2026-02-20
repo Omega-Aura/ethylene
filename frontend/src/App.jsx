@@ -4,6 +4,7 @@ import ParamForm, { getDefaults } from './components/ParamForm';
 import KPICards from './components/KPICards';
 import Charts from './components/Charts';
 import DataTable from './components/DataTable';
+import MathEquations from './components/MathEquations';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -57,17 +58,7 @@ function PathwayDiagram() {
   );
 }
 
-function EquationPanel() {
-  return (
-    <div className="eq-panel">
-      <div><span className="eq-label">Eq 1</span> dA<sub>p</sub>/dt = V<sub>ACS,max</sub> &middot; f<sub>stress</sub> &minus; k<sub>ACO</sub> &middot; A<sub>p</sub> &minus; k<sub>exp</sub> &middot; A<sub>p</sub></div>
-      <div><span className="eq-label">Eq 2</span> dA<sub>r</sub>/dt = k<sub>exp</sub> &middot; A<sub>p</sub> &middot; (V<sub>p</sub>/V<sub>r</sub>) &minus; V<sub>max</sub><sup>ACCD</sup> &middot; A<sub>r</sub>/(K<sub>m</sub>+A<sub>r</sub>) &middot; X<sub>b</sub> &minus; k<sub>loss</sub> &middot; A<sub>r</sub></div>
-      <div><span className="eq-label">Eq 3</span> dC<sub>E</sub>/dt = Y<sub>E</sub> &middot; k<sub>ACO</sub> &middot; A<sub>p</sub> &middot; (V<sub>p</sub>/V<sub>air</sub>) &minus; k<sub>vent</sub> &middot; C<sub>E</sub> &minus; k<sub>scrub</sub> &middot; C<sub>E</sub></div>
-      <div><span className="eq-label">Eq 4</span> dX<sub>b</sub>/dt = &mu;<sub>max</sub> &middot; A<sub>r</sub>/(K<sub>s</sub>+A<sub>r</sub>) &middot; X<sub>b</sub> &minus; k<sub>d</sub> &middot; X<sub>b</sub></div>
-      <div><span className="eq-label">Eq 5</span> dG/dt = r<sub>g</sub> &middot; [1 &minus; C<sub>E</sub><sup>n</sup>/(K<sub>E</sub><sup>n</sup> + C<sub>E</sub><sup>n</sup>)] &middot; G</div>
-    </div>
-  );
-}
+
 
 export default function App() {
   const [params, setParams] = useState(getDefaults());
@@ -115,7 +106,7 @@ export default function App() {
 
       <div className="container">
         <PathwayDiagram />
-        <EquationPanel />
+        <MathEquations />
 
         <ParamForm
           params={params}
