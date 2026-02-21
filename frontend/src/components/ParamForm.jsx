@@ -12,6 +12,46 @@ function K({ math }) {
     return <span ref={ref} />;
 }
 
+/* ═══ MODE DEFINITIONS ═══ */
+const MODES = [
+    {
+        id: 'baseline',
+        label: 'Conservative (export-only)',
+        description: 'v1 default — bacteria consume root-zone ACC only. ~18% ethylene reduction.',
+        color: '#94a3b8',
+        icon: '🔬',
+    },
+    {
+        id: 'high_export',
+        label: 'High ACC Export',
+        description: 'Increased ACC export rate (k_exp ≈ 0.45 h⁻¹) — more ACC routed to rhizosphere. Can reach >50% reduction.',
+        color: '#3b82f6',
+        icon: '🚀',
+    },
+    {
+        id: 'endophytic',
+        label: 'Endophytic ACCD (direct sink)',
+        description: 'Bacteria directly access plant-side ACC (f_direct = 0.5) — competing with ACO inside tissue.',
+        color: '#a855f7',
+        icon: '🧫',
+    },
+    {
+        id: 'feedback',
+        label: 'Regulatory Feedback (ACS/ACO)',
+        description: 'Ethylene negatively regulates ACS — ACCD-induced reduction cascades via lower ACC synthesis.',
+        color: '#f59e0b',
+        icon: '🔄',
+    },
+    {
+        id: 'custom',
+        label: 'Custom',
+        description: 'Manually configure all parameters below, including v2 extensions.',
+        color: '#2dd4bf',
+        icon: '⚙️',
+    },
+];
+
+/* ═══ PARAMETER GROUPS ═══ */
 const PARAM_GROUPS = [
     {
         title: 'Plant ACC / Ethylene',
@@ -68,6 +108,31 @@ const PARAM_GROUPS = [
         ],
     },
     {
+        title: 'Endophytic ACCD (v2)',
+        icon: '🧫',
+        description: 'Feature B — direct bacterial sink on plant-side ACC. Set f_direct > 0 to enable.',
+        v2: true,
+        fields: [
+            { id: 'f_direct', katex: 'f_{\\text{direct}}', unit: '0–1', default: 0.0, step: 0.1, hint: 'Fraction of Xb acting directly on plant ACC' },
+            { id: 'V_max_ACCD_direct', katex: 'V_{\\max,\\text{dir}}^{\\text{ACCD}}', unit: 'mM/(g·h)', default: 1.0, step: 0.1, hint: 'Vmax for direct ACCD on plant ACC' },
+            { id: 'K_m_ACCD_direct', katex: 'K_{m,\\text{dir}}^{\\text{ACCD}}', unit: 'mM', default: 1.5, step: 0.5, hint: 'Km for direct ACCD on plant ACC' },
+        ],
+    },
+    {
+        title: 'ACS/ACO Feedback (v2)',
+        icon: '🔄',
+        description: 'Feature C — negative feedback from ethylene on ACS (and optionally ACO) activity.',
+        v2: true,
+        fields: [
+            { id: 'fb_enable', katex: '\\text{fb\\_enable}', unit: '0/1', default: 0, step: 1, hint: 'Enable ACS feedback (0 = off, 1 = on)' },
+            { id: 'K_fb', katex: 'K_{\\text{fb}}', unit: 'M', default: 5e-5, step: 1e-5, hint: 'Ethylene level for 50% ACS repression' },
+            { id: 'n_fb', katex: 'n_{\\text{fb}}', unit: '–', default: 2.0, step: 0.5, hint: 'Hill coefficient for ACS feedback' },
+            { id: 'aco_fb_enable', katex: '\\text{aco\\_fb}', unit: '0/1', default: 0, step: 1, hint: 'Enable ACO feedback (0 = off, 1 = on)' },
+            { id: 'K_fb_aco', katex: 'K_{\\text{fb,ACO}}', unit: 'M', default: 5e-5, step: 1e-5, hint: 'Ethylene level for 50% ACO repression' },
+            { id: 'n_fb_aco', katex: 'n_{\\text{fb,ACO}}', unit: '–', default: 2.0, step: 0.5, hint: 'Hill coefficient for ACO feedback' },
+        ],
+    },
+    {
         title: 'Simulation Settings',
         icon: '⚙️',
         description: 'Time span, resolution, and initial state values for the ODE solver.',
@@ -82,29 +147,88 @@ const PARAM_GROUPS = [
     },
 ];
 
-export default function ParamForm({ params, onChange, onRun, onReset, loading }) {
+/* ═══ MODE PRESETS — override defaults when mode changes ═══ */
+const MODE_PARAM_OVERRIDES = {
+    baseline: {},
+    high_export: { k_exp: 0.45 },
+    endophytic: { f_direct: 0.5, V_max_ACCD_direct: 1.0, K_m_ACCD_direct: 1.5 },
+    feedback: { fb_enable: 1, K_fb: 2e-4, n_fb: 3.0 },
+    custom: {},
+};
+
+
+export default function ParamForm({ params, onChange, onRun, onReset, loading, mode, onModeChange }) {
     const handleChange = (id, val) => {
         onChange({ ...params, [id]: parseFloat(val) || 0 });
     };
 
+    const handleModeSelect = (modeId) => {
+        onModeChange(modeId);
+        // Apply mode preset values
+        const overrides = MODE_PARAM_OVERRIDES[modeId] || {};
+        // Reset v2 params to defaults first, then apply overrides
+        const base = getDefaults();
+        const newParams = { ...params };
+        // Reset v2-specific fields to defaults
+        ['f_direct', 'V_max_ACCD_direct', 'K_m_ACCD_direct', 'fb_enable', 'K_fb', 'n_fb', 'aco_fb_enable', 'K_fb_aco', 'n_fb_aco', 'k_exp'].forEach(k => {
+            newParams[k] = base[k];
+        });
+        // Apply mode overrides
+        Object.entries(overrides).forEach(([k, v]) => {
+            newParams[k] = v;
+        });
+        onChange(newParams);
+    };
+
     return (
         <div className="section">
+            {/* ── Mode Selector ── */}
             <div className="param-section-header">
+                <span className="param-section-icon">🎛️</span>
+                <span className="param-section-title">Simulation Mode</span>
+            </div>
+            <div className="param-section-note">
+                Select a scenario preset to explore different plant–microbe interaction mechanisms.
+                Each mode configures the v2 parameters automatically. Choose <strong>"Custom"</strong> for full manual control.
+            </div>
+            <div className="mode-selector-grid">
+                {MODES.map((m) => (
+                    <button
+                        key={m.id}
+                        className={`mode-card ${mode === m.id ? 'mode-active' : ''}`}
+                        style={{ '--mode-color': m.color }}
+                        onClick={() => handleModeSelect(m.id)}
+                    >
+                        <div className="mode-card-top">
+                            <span className="mode-icon">{m.icon}</span>
+                            <span className="mode-badge" style={{ background: m.color }}>{m.id.replace('_', ' ')}</span>
+                        </div>
+                        <div className="mode-label">{m.label}</div>
+                        <div className="mode-desc">{m.description}</div>
+                    </button>
+                ))}
+            </div>
+
+            {/* ── Parameters ── */}
+            <div className="param-section-header" style={{ marginTop: '2rem' }}>
                 <span className="param-section-icon">⚛️</span>
                 <span className="param-section-title">Model Parameters</span>
             </div>
             <div className="param-section-note">
                 Adjust the kinetic, volumetric, and initial-condition parameters below. Each group
-                corresponds to a module in the ODE system. Hover over any card for details.
+                corresponds to a module in the ODE system. <span style={{ color: '#a855f7' }}>Purple-bordered</span> cards are v2 extensions.
             </div>
 
             <div className="grid-form">
                 {PARAM_GROUPS.map((group, gi) => (
-                    <div className="param-card" key={group.title}>
+                    <div className={`param-card ${group.v2 ? 'param-card-v2' : ''}`} key={group.title}>
                         <div className="param-card-header">
                             <span className="param-card-badge">{group.icon}</span>
                             <div>
-                                <div className="param-card-title">{group.title}</div>
+                                <div className="param-card-title">
+                                    {group.title}
+                                    {group.v2 && <span className="v2-tag">NEW</span>}
+                                </div>
                                 <div className="param-card-desc">{group.description}</div>
                             </div>
                         </div>
